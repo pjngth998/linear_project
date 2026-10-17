@@ -55,6 +55,8 @@ class Layout:
     gap_threshold: float
     gap_small: float
     gap_large: float
+    blocks: list = field(default_factory=list)          # [[lid, ...]] ช่วงบรรทัดที่จัดระยะบรรทัด (refine)
+    indent_groups: list = field(default_factory=list)   # [[lid, ...]] บรรทัดที่ระดับย่อหน้าเดียวกัน (refine)
 
 
 # ------------------------------------------------------------------ B4

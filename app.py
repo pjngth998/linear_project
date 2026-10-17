@@ -219,6 +219,18 @@ with st.sidebar.expander("ปรับแก้และเส้นเรีย
     ma_window = st.select_slider("หน้าต่าง moving average (โหมด contour)", [3, 5, 7, 9, 11], d.ma_window)
     corner = st.slider("มุมแหลม (องศา) ที่ไม่ smooth", 20.0, 120.0, d.corner_deg, 5.0)
 
+with st.sidebar.expander("ความสวยของตัวอักษรและหน้ากระดาษ"):
+    shape_on = st.checkbox("ทำตัวเดียวกันให้หน้าตาเหมือนกัน (ต้นแบบจากลายมือตัวเอง)", d.shape_consistency,
+                           help="จับกลุ่มตัวที่หน้าตาคล้ายกันด้วย cosine similarity → หารูปเฉลี่ยของกลุ่ม → "
+                                "ดึงแต่ละตัวเข้าหารูปเฉลี่ยด้วย affine (least squares) + บิดเฉพาะจุดเล็กน้อย")
+    shape_beta = st.slider("แรงดึงเข้าหาต้นแบบ (affine, β)", 0.0, 1.0, d.shape_strength, 0.05)
+    shape_nr = st.slider("บิดเฉพาะจุด (ส่วนโค้ง/ป่อง)", 0.0, 1.0, d.shape_nonrigid, 0.05)
+    shape_cos = st.slider("ความคล้ายขั้นต่ำที่ถือว่าเป็นตัวเดียวกัน (cos)", 0.85, 0.98, d.shape_cos_min, 0.01,
+                          help="ต่ำ = จับกลุ่มได้มากขึ้น แต่เสี่ยงจับตัวที่แค่คล้าย (เช่น ข/ช) ไว้ด้วยกัน")
+    reg_sp = st.checkbox("ระยะห่างระหว่างบรรทัดเท่ากัน", d.regularize_spacing,
+                         help="ไม่ทำบนกระดาษที่มีเส้นบรรทัด · ช่วงที่เว้นห่างตั้งใจ (ขึ้นย่อหน้าใหม่) ไม่ถูกบีบ")
+    reg_in = st.checkbox("แนวหน้าบรรทัด (ย่อหน้าระดับเดียวกัน) ตรงกัน", d.regularize_indent)
+
 with st.sidebar.expander("ประเมินผล (E)"):
     ocr = st.checkbox("วัด OCR confidence (ต้องมี tesseract)", False)
     ocr_lang = st.text_input("ภาษา tesseract", d.ocr_lang)
@@ -229,6 +241,8 @@ params = Params(
     nontext_height_h=nontext_h, nontext_width_h=nontext_w, mark_height_h=mark_h, baseline_min_glyphs=min_glyphs,
     bind_fractions=bind_frac, freeze_regions=freeze_reg, protect_images=prot_img, protect_headings=prot_head, freeze_neat_lines=neat, freeze_math=freeze_math, bracket_h_h=bracket_h, sparse_fill=sparse_fill,
     freeze_line_frac=freeze_frac,
+    shape_consistency=shape_on, shape_strength=shape_beta, shape_nonrigid=shape_nr, shape_cos_min=shape_cos,
+    regularize_spacing=reg_sp, regularize_indent=reg_in,
     enable_slant=en_slant, enable_scale=en_scale, enable_baseline=en_base, enable_spacing=en_space,
     enable_smoothing=en_smooth, slant_target=slant_target, slant_level=slant_level, slant_clip_deg=slant_clip, slant_shrink_n0=shrink_n0,
     scale_min=scale_rng[0], scale_max=scale_rng[1], alpha=alpha, ma_window=ma_window, corner_deg=corner,
@@ -301,17 +315,19 @@ for ti, (tab, r) in enumerate(zip(tabs, results)):
             st.markdown(f"<div class='rr-note'>⚠ {n}</div>", unsafe_allow_html=True)
 
         rows = r.metrics.get("rows", [])
-        mc = st.columns(len(rows) + 1) if rows else []
+        n_m = len(rows) + 1
+        mc = (st.columns(4) + st.columns(4)) if n_m > 5 else (st.columns(n_m) if rows else [])
         short = {"baseline_sigma": "เบี่ยงจากเส้นบรรทัด", "slant_std_deg": "SD มุมเอียง (°)",
-                 "height_cv": "CV ความสูง", "gap_cv": "CV ช่องไฟ"}
+                 "height_cv": "CV ความสูง", "gap_cv": "CV ช่องไฟ", "shape_dev": "ต่างจากต้นแบบ",
+                 "line_pitch_cv": "CV ระยะบรรทัด", "indent_dev": "SD แนวหน้าบรรทัด"}
         for c, row in zip(mc, rows):
             delta = None
             if not (np.isnan(row["before"]) or np.isnan(row["after"])):
                 delta = f"{row['after'] - row['before']:+.3f} ({-row['improve_pct']:+.0f}%)"
-            c.metric(short[row["metric"]], fmt(row["after"]), delta, delta_color="inverse",
+            c.metric(short.get(row["metric"], row["metric"]), fmt(row["after"]), delta, delta_color="inverse",
                      help=f"{row['label']} — ก่อน {fmt(row['before'])} · ยิ่งต่ำยิ่งเป็นระเบียบ")
         if mc:
-            mc[-1].metric("ความคงเอกลักษณ์", fmt(r.metrics.get("identity_cos"), 4),
+            mc[len(rows)].metric("ความคงเอกลักษณ์", fmt(r.metrics.get("identity_cos"), 4),
                           help="cosine similarity รูปทรงก่อน/หลัง (1 = เหมือนเดิม) "
                                f"· ต่ำสุดรายตัว {fmt(r.metrics.get('identity_cos_min'), 4)}")
 

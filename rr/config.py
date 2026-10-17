@@ -33,6 +33,7 @@ class Params:
     deskew_max_deg: float = 10.0
     deskew_step_deg: float = 0.2
 
+
     # ---------- B. วิเคราะห์เลย์เอาต์ ----------
     nontext_height_h: float = 3.0       # สูงเกินกี่ h = non-text
     nontext_width_h: float = 8.0        # กว้างเกินกี่ h = non-text
@@ -86,6 +87,25 @@ class Params:
     scale_min: float = 0.75
     scale_max: float = 1.33
     scale_skip_outliers: bool = True    # ตัวที่ต้องย่อ/ขยายเกินช่วงนี้ = ไม่ปรับเลย (แทนการตัดที่ขอบช่วง)
+
+    # ---- C3.5 รูปทรงสม่ำเสมอ (ต้นแบบจากลายมือของผู้เขียนเอง)
+    shape_consistency: bool = True
+    shape_strength: float = 0.6         # β: ดึงเข้าหาต้นแบบกี่ส่วน (0 = ไม่แตะ, 1 = เท่าต้นแบบเท่าที่ affine ทำได้)
+    shape_cos_min: float = 0.92         # cosine similarity ขั้นต่ำที่ถือว่าเป็นตัวเดียวกัน
+    shape_min_members: int = 3          # กลุ่มต้องมีอย่างน้อยกี่ตัวถึงสร้างต้นแบบ
+    shape_points: int = 64              # จำนวนจุดที่ resample contour
+    shape_max_dev: float = 0.25         # ต่างจากต้นแบบเกินนี้ (RMS/ขนาด) → ไม่แตะ
+    shape_max_change: float = 0.2       # singular value ของ A ต้องอยู่ใน [1−x, 1+x]
+    shape_max_rot_deg: float = 10.0
+    shape_nonrigid: float = 0.5         # บิดเฉพาะจุด (ส่วนที่ affine ทำไม่ได้) เข้าหาต้นแบบกี่ส่วน
+    shape_max_disp_h: float = 0.06      # บิดได้ไม่เกิน (× ความสูงตัว) ต่อจุด
+
+    # ---- C6 ระยะบรรทัดและแนวหน้าบรรทัด
+    regularize_spacing: bool = True     # ระยะห่างระหว่างบรรทัดเท่ากัน (ไม่ทำบนกระดาษมีเส้นบรรทัด)
+    regularize_indent: bool = True      # จุดเริ่มบรรทัดที่ระดับย่อหน้าเดียวกันตรงกัน
+    line_break_ratio: float = 1.45      # ระยะบรรทัดต่างจากค่ากลางเกินกี่เท่า = ขึ้นช่วงใหม่ (ไม่ปรับข้าม)
+    line_max_shift_xh: float = 0.5      # เลื่อนบรรทัดขึ้น/ลงได้ไม่เกิน (× x-height)
+    indent_tol_xh: float = 0.9          # จุดเริ่มห่างกันไม่เกินนี้ = ระดับย่อหน้าเดียวกัน
     resid_max_xh: float = 1.2           # ยกตัวที่ลอย/จมจากเส้นบรรทัดกลับได้ไม่เกิน (k·x-height) เกินนี้ถือว่าวัดพลาด ไม่แก้
     word_gap_alpha: float = 0.5         # ช่องระหว่างคำปรับเข้าหาค่ากลางเบากว่าช่องในคำ (คูณกับ α)
     word_letter_ratio: float = 2.5      # ช่องคำต้องกว้างอย่างน้อยกี่เท่าของช่องในคำ (ค่ากลางของบรรทัด)

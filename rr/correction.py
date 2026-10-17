@@ -75,6 +75,7 @@ def compute_corrections(glyphs: list[Glyph], lay: Layout, stats: PageStats, p: P
             owned[g.owner].append(g.gid)                                # สระบน/ล่างไม่นับ อยู่ในแนวตัวอยู่แล้ว
 
     skipped_lines = 0
+    line_T0a: dict[int, tuple] = {}
     for L in lay.lines:
         # ---- C5 ความมั่นใจต่ำ / บรรทัดสูตร → ไม่แก้ทั้งบรรทัด
         if L.frozen:
@@ -138,6 +139,19 @@ def compute_corrections(glyphs: list[Glyph], lay: Layout, stats: PageStats, p: P
         for i in L.members:
             if gl[i].frozen:
                 T0a[i] = np.eye(3)
+        line_T0a[L.lid] = (T0a, y_t)
+
+    # ---- C3.5 ปรับรูปทรงให้สม่ำเสมอ (ต้นแบบจากลายมือของผู้เขียนเอง) — ทำก่อนจัดช่องไฟ
+    #      เพื่อให้ช่องไฟคิดจากความกว้างหลังปรับรูปแล้ว
+    shape_info = {}
+    if p.shape_consistency:
+        from .refine import shape_consistency
+        shape_info = shape_consistency(glyphs, lay, line_T0a, p)
+
+    for L in lay.lines:
+        if L.lid not in line_T0a:
+            continue
+        T0a, y_t = line_T0a[L.lid]
 
         # ---- C4 ระยะห่าง
         shift = {i: 0.0 for i in L.members}
@@ -218,4 +232,5 @@ def compute_corrections(glyphs: list[Glyph], lay: Layout, stats: PageStats, p: P
         "class_target_height": {c: round(v, 1) for c, v in cls_target.items()},
         "skipped_short_lines": skipped_lines,
         "frozen_lines": sum(1 for L in lay.lines if L.frozen),
+        "shape": shape_info,
     }

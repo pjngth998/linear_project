@@ -38,6 +38,8 @@ class Glyph:
     cls: str = ""                          # mid | asc | desc | tall | mark
     merged: bool = False
     word: int = -1
+    disp: tuple | None = None              # (จุดควบคุมบนตัวต้นฉบับ, เวกเตอร์เลื่อน) จากการบิดเข้าหาต้นแบบ
+    shape_cluster: int = -1                # กลุ่มรูปทรง (ตัวที่หน้าตาเหมือนกัน) จาก refine.shape_consistency
     slant_deg: float = float("nan")        # มุมเอียงของตัวนี้ (ไว้ประเมินผล)
     T: np.ndarray = field(default_factory=lambda: np.eye(3))
     notes: list = field(default_factory=list)

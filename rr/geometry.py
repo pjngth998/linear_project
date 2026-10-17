@@ -205,3 +205,13 @@ def shape_cosine(P: np.ndarray, Q: np.ndarray, n: int = 64) -> float:
     for s in range(n):
         best = max(best, float(a @ np.roll(B, s, axis=0).ravel()))
     return best
+
+
+# ---------------------------------------------------------------- non-rigid (รูปทรงสม่ำเสมอ)
+def rbf_displacement(Q: np.ndarray, C: np.ndarray, D: np.ndarray, sigma: float) -> np.ndarray:
+    """เวกเตอร์เลื่อนที่จุด Q (M×2) จากเวกเตอร์เลื่อน D ที่จุดควบคุม C (N×2)
+    d(q) = Σ w_k d_k / Σ w_k ,  w_k = exp(−‖q − c_k‖² / 2σ²)   (เฉลี่ยถ่วงน้ำหนักแบบ Gaussian)
+    เขียนเป็นเมทริกซ์:  d = (W D) / (W 1)   โดย W เป็น M×N"""
+    d2 = ((Q[:, None, :] - C[None, :, :]) ** 2).sum(axis=2)
+    W = np.exp(-d2 / (2 * sigma * sigma))
+    return (W @ D) / (W.sum(axis=1, keepdims=True) + 1e-12)

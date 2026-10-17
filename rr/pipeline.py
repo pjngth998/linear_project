@@ -12,6 +12,7 @@ import numpy as np
 from .components import extract_glyphs
 from .config import Params
 from .correction import compute_corrections
+from .refine import regularize_lines
 from .evaluate import evaluate, ocr_confidence
 from .io_loader import PageInput
 from .layout import analyze_layout
@@ -61,6 +62,9 @@ def run_page(page: PageInput, p: Params) -> PageResult:
 
     t2 = time.perf_counter()
     cinfo = compute_corrections(glyphs, lay, stats, p)
+    if p.regularize_spacing or p.regularize_indent:
+        ruled = "ruled_lines" in pre.steps
+        cinfo["lines"] = regularize_lines(glyphs, lay, p, ruled)
     cinfo["nontext"] = {**nt_info, "by_reason": {
         r: sum(1 for g in glyphs if g.kind == "nontext" and g.nt_reason == r)
         for r in ("large", "frame", "bracket", "line", "sparse", "image", "in_image", "heading")},

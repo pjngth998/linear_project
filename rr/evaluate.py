@@ -34,6 +34,62 @@ def _cv(v):
     return float(np.std(v) / np.mean(v)) if len(v) >= 3 and np.mean(v) > 0 else float("nan")
 
 
+def _refine_metrics(glyphs, lay, finals, p) -> tuple:
+    """ตัวชี้วัดของการปรับรูปทรงและการจัดบรรทัด (วัดก่อน/หลังด้วยวิธีเดียวกัน)
+    shape_dev      ในแต่ละกลุ่มตัวที่หน้าตาเหมือนกัน: ระยะ RMS ของแต่ละตัวจากรูปเฉลี่ยของกลุ่ม หารด้วยขนาด
+    line_pitch_cv  CV ของระยะห่างระหว่างบรรทัดในแต่ละช่วง (block)
+    indent_dev     SD ของจุดเริ่มบรรทัดในกลุ่มย่อหน้าเดียวกัน หารด้วย x-height"""
+    from .refine import prototype
+    gl = {g.gid: g for g in glyphs}
+    lines = {L.lid: L for L in lay.lines}
+    B, A = {}, {}
+    # --- shape
+    groups = {}
+    for g in glyphs:
+        if g.shape_cluster >= 0 and g.gid in finals:
+            groups.setdefault(g.shape_cluster, []).append(g)
+    for store, src in ((B, lambda g: g.outer), (A, lambda g: finals[g.gid][0])):
+        devs = []
+        for mem in groups.values():
+            shapes = []
+            for g in mem:
+                X = G.resample_n(src(g), p.shape_points)
+                X = X - X.mean(axis=0)
+                shapes.append(X / (np.sqrt(np.mean(np.sum(X ** 2, axis=1))) + 1e-9))
+            proto, shifts = prototype(shapes)
+            for X, s_ in zip(shapes, shifts):
+                devs.append(float(np.sqrt(np.mean(np.sum((np.roll(X, s_, axis=0) - proto) ** 2, axis=1)))))
+        if devs:
+            store["shape_dev"] = float(np.mean(devs))
+
+    def base_y(L, src):
+        ys = [src(i)[:, 1].max() for i in L.members if gl[i].cls in ("mid", "asc")]
+        return float(np.median(ys)) if ys else None
+
+    def start_x(L, src):
+        return float(min(src(i)[:, 0].min() for i in L.members))
+
+    for store, src in ((B, lambda i: gl[i].outer), (A, lambda i: finals[i][0])):
+        cvs = []
+        for blk in getattr(lay, "blocks", []):
+            ys = [base_y(lines[l], src) for l in blk]
+            if None in ys or len(ys) < 3:
+                continue
+            d = np.diff(ys)
+            if np.mean(d) > 0:
+                cvs.append(float(np.std(d) / np.mean(d)))
+        if cvs:
+            store["line_pitch_cv"] = float(np.mean(cvs))
+        sds = []
+        for grp in getattr(lay, "indent_groups", []):
+            xs = [start_x(lines[l], src) for l in grp]
+            xh = float(np.median([lines[l].xh for l in grp]))
+            sds.append(float(np.std(xs)) / max(xh, 1e-6))
+        if sds:
+            store["indent_dev"] = float(np.mean(sds))
+    return B, A
+
+
 def evaluate(glyphs: list[Glyph], lay: Layout, finals: dict, p: Params) -> dict:
     gl = {g.gid: g for g in glyphs}
     before = {"baseline": [], "slant": [], "gaps": [], "h": {"mid": [], "asc": [], "desc": []}}
@@ -99,14 +155,22 @@ def evaluate(glyphs: list[Glyph], lay: Layout, finals: dict, p: Params) -> dict:
         }
 
     b, a = pack(before), pack(after)
+    extra_b, extra_a = _refine_metrics(glyphs, lay, finals, p)
+    b.update(extra_b)
+    a.update(extra_a)
     rows = []
     names = {
         "baseline_sigma": "ความเบี่ยงจากเส้นบรรทัด (σ/x-height)",
         "slant_std_deg": "ความแปรปรวนของมุมเอียง (SD, องศา)",
         "height_cv": "ความไม่สม่ำเสมอของความสูง (CV)",
         "gap_cv": "ความไม่สม่ำเสมอของช่องไฟ (CV)",
+        "shape_dev": "ความต่างของรูปทรงตัวเดียวกัน (RMS/ขนาด)",
+        "line_pitch_cv": "ความไม่สม่ำเสมอของระยะบรรทัด (CV)",
+        "indent_dev": "ความไม่ตรงของแนวหน้าบรรทัด (SD/x-height)",
     }
     for k, label in names.items():
+        if k not in b:
+            continue
         bv, av = b[k], a[k]
         imp = (bv - av) / bv * 100 if bv and not np.isnan(bv) and not np.isnan(av) else float("nan")
         rows.append({"metric": k, "label": label, "before": bv, "after": av, "improve_pct": imp})

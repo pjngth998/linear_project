@@ -46,10 +46,23 @@ def smooth_contour(P: np.ndarray, p: Params) -> np.ndarray:
     return G.moving_average_closed(Q, w, keep=corner)
 
 
+def _disp_field(g: Glyph):
+    """จุดควบคุม (ในกรอบปลายทาง), เวกเตอร์เลื่อน, σ ของการบิดเฉพาะจุด — None ถ้าตัวนี้ไม่ได้บิด"""
+    if g.disp is None:
+        return None
+    S, D = g.disp
+    C = G.apply(g.T, S)
+    sigma = max(1.5, 0.12 * float(np.ptp(C[:, 1])))
+    return C, D, sigma
+
+
 def final_contours(g: Glyph, p: Params) -> list[np.ndarray]:
     out = []
+    fld = _disp_field(g)
     for c in g.all_contours():
         P = G.apply(g.T, c) if not G.is_identity(g.T) else c.astype(np.float64)
+        if fld is not None:
+            P = P + G.rbf_displacement(P, *fld)
         if p.enable_smoothing and g.role in ("base", "mark"):
             P = smooth_contour(P, p)
         out.append(P)
@@ -125,6 +138,17 @@ def _composite_warp(layer: Layer, g: Glyph, alpha_img: np.ndarray, color):
     # พิกัด patch ต้นทาง → patch ปลายทาง:  M = Tr(−d0) · T · Tr(s0)
     M = G.T_translate(-dx0, -dy0) @ g.T @ G.T_translate(x0, y0)
     a = cv2.warpAffine(a_src, M[:2], (dx1 - dx0, dy1 - dy0), flags=cv2.INTER_LINEAR, borderValue=0)
+    fld = _disp_field(g)
+    if fld is not None:
+        # บิดเฉพาะจุด: พิกเซลปลายทาง q ดึงค่าจาก q − d(q)  (d เล็กมาก ใช้ค่าประมาณ inverse แบบนี้ได้)
+        C, D, sigma = fld
+        hh, ww = a.shape
+        yy, xx = np.mgrid[0:hh, 0:ww].astype(np.float64)
+        Q = np.column_stack([xx.ravel() + dx0, yy.ravel() + dy0])
+        d = G.rbf_displacement(Q, C, D, sigma)
+        mx = (xx.ravel() - d[:, 0]).reshape(hh, ww).astype(np.float32)
+        my = (yy.ravel() - d[:, 1]).reshape(hh, ww).astype(np.float32)
+        a = cv2.remap(a, mx, my, cv2.INTER_LINEAR, borderValue=0)
     layer.blend(dy0, dy1, dx0, dx1, a, color)
 
 
