@@ -52,6 +52,8 @@ class Params:
     neat_resid_xh: float = 0.03         # ฐานเบี่ยงไม่เกิน (σ/x-height) …
     neat_height_cv: float = 0.08        # … และความสูงสม่ำเสมอ (CV) = เรียบร้อยแล้ว
     freeze_regions: bool = True         # ข้อความในกรอบ / ในภาพวาด → คงไว้ตามต้นฉบับ
+    bind_scripts: bool = True           # ตัวยก/ตัวห้อย (t², v₀) ผูกกับตัวทางซ้าย
+    bind_fractions: bool = True         # เศษส่วน (dy/dx) ผูกเป็นหน่วยแข็ง: เลื่อนตามบรรทัด ไม่เอียง/ไม่ย่อขยาย
     freeze_math: bool = True            # สูตร (เศษส่วน, ตัวซ้อนแนวตั้ง) → คงไว้ตามต้นฉบับ
     math_stack_min: int = 2             # จำนวนคู่ตัวที่ซ้อนแนวตั้งในบรรทัด ขั้นต่ำที่ถือว่าเป็นสูตร
     freeze_line_frac: float = 0.3       # ตัวในบรรทัดถูก freeze เกินสัดส่วนนี้ → freeze ทั้งบรรทัด

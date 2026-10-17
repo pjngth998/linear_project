@@ -41,8 +41,9 @@ def evaluate(glyphs: list[Glyph], lay: Layout, finals: dict, p: Params) -> dict:
     cos = []
 
     for L in lay.lines:
-        ids = L.members
-        if not ids or L.frozen:          # บรรทัดที่ freeze ไม่ถูกแก้ ไม่นับในตัวชี้วัด
+        # บรรทัด/ตัวที่ freeze ไม่ถูกแก้ ไม่นับในตัวชี้วัด  เศษส่วน (หน่วยแข็ง) ก็ไม่นับรูปทรง/ความสูง
+        ids = [i for i in L.members if not gl[i].frozen and gl[i].cls != "fraction"]
+        if not ids or L.frozen:
             continue
         # baseline residual
         sel = [i for i in ids if gl[i].cls in ("mid", "asc")]

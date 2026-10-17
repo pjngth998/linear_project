@@ -93,7 +93,7 @@ def compute_corrections(glyphs: list[Glyph], lay: Layout, stats: PageStats, p: P
 
             # S: shear
             k = 0.0
-            if p.enable_slant and g.cls != "enclosed":
+            if p.enable_slant and g.cls not in ("enclosed", "fraction"):
                 cur = word_slant.get(g.word, line_slant[L.lid])
                 n = len(segs[i])
                 if p.slant_level == "glyph" and n >= 6:

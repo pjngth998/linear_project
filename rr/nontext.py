@@ -167,27 +167,218 @@ def absorb_protected(glyphs: list, H: float, p: Params, color_img: np.ndarray | 
     return info
 
 
-def _fraction_groups(texts: list, H: float) -> list[list]:
+def _is_bar(g, H: float) -> bool:
+    """เส้นเศษส่วน: บางและแนวนอน
+    - เส้นตรงบางชัดเจน (สูงไม่ถึง 0.45h และกว้างกว่าสูง 1.4 เท่า) หรือ
+    - เส้นที่ลากหนา/เอียงเล็กน้อยแบบลายมือ: covariance บอกว่าเป็นเส้น (λ₁/λ₂ สูง) และแกนหลักเกือบแนวนอน"""
+    if g.w <= 0.4 * H or g.h > 0.8 * H:
+        return False
+    if g.h < 0.45 * H and g.w > 1.4 * max(g.h, 1.0):
+        return True
+    if len(g.outer) >= 8 and g.w > 0.8 * H and g.w > 1.6 * g.h:
+        _, lam, E = G.principal_axes(g.outer)
+        ratio = lam[0] / max(lam[1], 1e-9)
+        ang = abs(np.degrees(np.arctan2(E[1, 0], E[0, 0])))
+        ang = min(ang, 180 - ang)
+        return ratio > 5 and ang < 25
+    return False
+
+
+def _fraction_groups(texts: list, H: float, bar_pool: list | None = None) -> list[list]:
     """หาเส้นเศษส่วน: แนวนอน บาง สั้น และมีตัวอักษรอยู่ทั้งเหนือและใต้ (ซ้อนในช่วงแกน x ของเส้น)
     คืนกลุ่ม [เส้น, ตัวบน..., ตัวล่าง...]
     เครื่องหมาย - และ = ไม่โดน เพราะไม่มีตัวอักษรครอบทั้งบนและล่าง"""
     groups = []
-    for bar in texts:
-        if not (bar.w > 0.7 * H and bar.h < 0.25 * H and bar.w > 4 * max(bar.h, 1.0)):
+    for bar in (bar_pool if bar_pool is not None else texts):
+        if not _is_bar(bar, H):
             continue
         above, below = [], []
         for o in texts:
-            if o is bar or o.w <= 0:
+            if o is bar or o.w <= 0 or o.kind != "text":
                 continue
-            if _overlap(o.x0, o.x1, bar.x0, bar.x1) < 0.6 * o.w:
+            # ตัวบน/ล่างของเศษส่วน: จุดกึ่งกลางอยู่ในช่วงของเส้น (เผื่อขอบเล็กน้อย) หรือทับกันเกินครึ่ง
+            in_span = bar.x0 - 0.25 * H <= o.cx <= bar.x1 + 0.25 * H
+            if not in_span and _overlap(o.x0, o.x1, bar.x0, bar.x1) < 0.5 * o.w:
                 continue
-            if o.y1 <= bar.cy and bar.y0 - o.y1 < 0.8 * H:
+            if o.h > 2.5 * H:
+                continue
+            if o.y1 <= bar.cy + 0.15 * H and bar.y0 - o.y1 < 1.0 * H and o.cy < bar.cy:
                 above.append(o)
-            elif o.y0 >= bar.cy and o.y0 - bar.y1 < 0.8 * H:
+            elif o.y0 >= bar.cy - 0.15 * H and o.y0 - bar.y1 < 1.3 * H and o.cy > bar.cy:
                 below.append(o)
         if above and below:
+            # ขยายตัวเศษ/ตัวส่วนให้ครบ: ชิ้นที่อยู่แถวเดียวกันและต่อกันในแนวนอน (วงเล็บ, ตัวยก, ตัวห้อย)
+            # เช่น (v₀ sinα)² ที่กว้างกว่าเส้นเศษส่วน ไม่อย่างนั้นส่วนที่ล้นจะถูกจัดแยกแล้วไปทับเส้น
+            for part, side in ((above, -1), (below, 1)):
+                grew = True
+                while grew:
+                    grew = False
+                    px0 = min(g.x0 for g in part); px1 = max(g.x1 for g in part)
+                    py0 = min(g.y0 for g in part); py1 = max(g.y1 for g in part)
+                    for o in texts:
+                        if o is bar or o in above or o in below or o.h > 2.5 * H or o.kind != "text":
+                            continue
+                        if (o.cy - bar.cy) * side <= 0:          # ต้องอยู่ฝั่งเดียวกับกลุ่มนี้
+                            continue
+                        gap = max(px0 - o.x1, o.x0 - px1)
+                        vov = _overlap(o.y0, o.y1, py0 - 0.3 * H, py1 + 0.3 * H)
+                        if gap <= 0.45 * H and vov >= 0.4 * o.h:
+                            part.append(o)
+                            grew = True
             groups.append([bar] + above + below)
     return groups
+
+
+def bind_scripts(glyphs: list, lay, H: float, p: Params) -> int:
+    """ตัวยก/ตัวห้อย (t², v₀, x₁): ชิ้นเล็กที่อยู่ติดขวาของตัวก่อนหน้า และสูง/ต่ำกว่าแนวตัวปกติ
+    → เป็น mark ของตัวทางซ้าย เคลื่อนไปด้วยกัน (ไม่ถูกยกลงเส้นบรรทัดจนกลายเป็นตัวปกติ เช่น v₀ → vo)"""
+    gl = {g.gid: g for g in glyphs}
+    n = 0
+    for L in lay.lines:
+        mem = [gl[i] for i in L.members]
+        mids = [g.h for g in mem if g.cls == "mid"]
+        if len(mids) < 3:
+            continue
+        hm = float(np.median(mids))
+        mem.sort(key=lambda g: g.x0)
+        for k in range(1, len(mem)):
+            g, left = mem[k], mem[k - 1]
+            if g.cls in ("fraction", "enclosed") or left.cls in ("fraction",) or g.h > 0.75 * hm:
+                continue
+            if g.x0 - left.x1 > 0.35 * H or g.x0 < left.cx:
+                continue
+            dtop = float(L.sdist(g.cx, g.y0)) + L.xh       # 0 = ขอบบนแนว x-height
+            dbot = float(L.sdist(g.cx, g.y1))               # 0 = baseline
+            sub = dbot > 0.25 * L.xh and dtop > 0.15 * L.xh   # ห้อยต่ำกว่าเส้น
+            sup = dtop < -0.25 * L.xh and dbot < -0.25 * L.xh  # ลอยเหนือแนวตัว
+            if not (sub or sup):
+                continue
+            L.members.remove(g.gid)
+            L.marks.append(g.gid)
+            g.role, g.cls, g.owner, g.zone = "mark", "mark", left.gid, "middle"
+            n += 1
+    return n
+
+
+def _merge_math_groups(groups: list, texts: list, H: float) -> list:
+    """รวมเศษส่วนที่ซ้อนกัน/อยู่ติดกันเป็น "นิพจน์" เดียว แล้วดูดสิ่งที่อยู่ในแถวเดียวกันของนิพจน์เข้ามา
+    เช่น  dr/ds = (dr/dt)/(ds/dt) = v/|v| = T  → ก้อนเดียว เคลื่อนแบบแข็งทั้งก้อน
+    - เศษส่วนซ้อน (เส้นของตัวในอยู่ในตัวเศษของตัวนอก) จะมีชิ้นร่วมกัน → union
+    - ชิ้นที่อยู่ระหว่าง/ติดกับนิพจน์ (=, +, ตัวแปร) ในแนวตั้งของนิพจน์ → ดูดเข้า
+    เส้นที่ยาวที่สุดเป็นตัวหลัก (ตัวแรกของกลุ่ม)"""
+    # 1) union กลุ่มที่มีชิ้นร่วมกันหรือกรอบทับกัน
+    merged = []
+    for grp in groups:
+        gset = {g.gid: g for g in grp}
+        for m in merged:
+            mx0 = min(g.x0 for g in m.values()); mx1 = max(g.x1 for g in m.values())
+            my0 = min(g.y0 for g in m.values()); my1 = max(g.y1 for g in m.values())
+            gx0 = min(g.x0 for g in grp); gx1 = max(g.x1 for g in grp)
+            gy0 = min(g.y0 for g in grp); gy1 = max(g.y1 for g in grp)
+            if set(m) & set(gset) or (_overlap(mx0, mx1, gx0, gx1) > 0 and _overlap(my0, my1, gy0, gy1) > 0):
+                m.update(gset)
+                break
+        else:
+            merged.append(gset)
+    # 2) ดูดชิ้นในแถวเดียวกันที่อยู่ติดกัน (ช่องไม่เกิน ~1.2h) และศูนย์กลางอยู่ในช่วงสูงของนิพจน์
+    #    และเชื่อมนิพจน์ที่อยู่ติดกันให้เป็นก้อนเดียว
+    changed = True
+    while changed:
+        changed = False
+        for m in merged:
+            if not m:
+                continue
+            x0 = min(g.x0 for g in m.values()); x1 = max(g.x1 for g in m.values())
+            y0 = min(g.y0 for g in m.values()); y1 = max(g.y1 for g in m.values())
+            for o in texts:
+                if o.gid in m or o.h > 2.5 * H:
+                    continue
+                gap = max(x0 - o.x1, o.x0 - x1)
+                if gap <= 1.8 * H and y0 - 0.2 * H <= o.cy <= y1 + 0.2 * H:
+                    m[o.gid] = o
+                    changed = True
+            for m2 in merged:
+                if m2 is m or not m2:
+                    continue
+                a0 = min(g.x0 for g in m2.values()); a1 = max(g.x1 for g in m2.values())
+                b0 = min(g.y0 for g in m2.values()); b1 = max(g.y1 for g in m2.values())
+                if max(x0 - a1, a0 - x1) <= 1.8 * H and _overlap(y0, y1, b0, b1) > 0.3 * min(y1 - y0, b1 - b0):
+                    m.update(m2)
+                    m2.clear()
+                    changed = True
+            if changed:
+                break
+    out = []
+    for m in merged:
+        if not m:
+            continue
+        items = list(m.values())
+        bars = [g for g in items if _is_bar(g, H)]
+        main = max(bars or items, key=lambda g: g.w)
+        out.append([main] + [g for g in items if g is not main])
+    return out
+
+
+def bind_fractions(glyphs: list, lay, H: float, p: Params) -> int:
+    """เศษส่วน (dT/ds, 1/|v|, dy/dx …) → ผูกเป็นหน่วยเดียวที่เคลื่อนแบบแข็ง (rigid)
+    - เส้นเศษส่วนเป็น "ตัวฐาน" ของบรรทัด (cls = fraction) ตัวบน/ตัวล่างเป็น mark ของเส้น → ใช้ T เดียวกัน
+    - รวมเครื่องหมายสูงแคบที่ครอบเศษส่วน (|  |, ( ), [ ]) ที่อยู่ติดกันเข้ากลุ่มด้วย
+    - หน่วยนี้ไม่ถูกเอียง/ย่อขยาย แค่เลื่อนตามเส้นบรรทัดและช่องไฟ → รูปสูตรไม่บิด แต่ยังเข้าแถวกับข้อความรอบ ๆ"""
+    texts = [g for g in glyphs if g.kind == "text"]
+    # เส้นเศษส่วนยาว ๆ มักถูกจัดเป็น non-text "line" ไปก่อน → ให้เป็นผู้สมัครเส้นเศษส่วนด้วย
+    bars = [g for g in glyphs if g.kind == "nontext" and g.nt_reason == "line" and g.h < 0.6 * H and g.w < 12 * H]
+    groups = _fraction_groups(texts + bars, H, bar_pool=bars + texts)
+    groups = _merge_math_groups(groups, texts, H)
+    used = set()
+    n = 0
+    for grp in groups:
+        bar = grp[0]
+        if bar.gid in used or any(g.gid in used for g in grp):
+            continue
+        x0 = min(g.x0 for g in grp); x1 = max(g.x1 for g in grp)
+        y0 = min(g.y0 for g in grp); y1 = max(g.y1 for g in grp)
+        # เครื่องหมายครอบ: สูงอย่างน้อยครึ่งหนึ่งของกลุ่ม แคบ และอยู่ชิดซ้าย/ขวา
+        for o in glyphs:
+            if o in grp or o.kind == "noise" or o.gid in used:
+                continue
+            tall_thin = o.h >= 0.5 * (y1 - y0) and o.w <= 0.45 * o.h
+            vov = _overlap(o.y0, o.y1, y0, y1) >= 0.6 * o.h
+            near = (0 <= x0 - o.x1 <= 0.8 * H) or (0 <= o.x0 - x1 <= 0.8 * H)
+            if tall_thin and vov and near:
+                grp.append(o)
+        x0 = min(g.x0 for g in grp); x1 = max(g.x1 for g in grp)
+        # บรรทัดที่เศษส่วนนี้อยู่: เส้นเศษส่วนอยู่ราวกลาง x-height ของบรรทัดนั้น
+        best, best_d = None, 1e18
+        for L in lay.lines:
+            if not L.members or not (L.x0 - 3 * H <= bar.cx <= L.x1 + 3 * H):
+                continue
+            d = abs(float(L.sdist(bar.cx, bar.cy)) + 0.5 * L.xh)
+            if d < best_d and d < 1.5 * L.xh + 0.5 * H:
+                best, best_d = L, d
+        if best is None:
+            continue
+        for L in lay.lines:
+            for g in grp:
+                if g.gid in L.members:
+                    L.members.remove(g.gid)
+                if g.gid in L.marks:
+                    L.marks.remove(g.gid)
+        best.members.append(bar.gid)
+        best.members.sort(key=lambda k: next(g for g in glyphs if g.gid == k).cx)
+        bar.kind, bar.role, bar.cls, bar.line, bar.zone, bar.owner = "text", "base", "fraction", best.lid, "middle", -1
+        bar.word = -1
+        for g in grp[1:]:
+            g.kind, g.role, g.cls, g.owner, g.line, g.zone = "text", "mark", "mark", bar.gid, best.lid, "middle"
+            if g.gid not in best.marks:
+                best.marks.append(g.gid)
+        used.update(g.gid for g in grp)
+        n += 1
+    for L in lay.lines:                         # ช่วงของบรรทัดหลังย้ายสมาชิก
+        if L.members:
+            gl = {g.gid: g for g in glyphs}
+            L.x0 = min(gl[i].x0 for i in L.members)
+            L.x1 = max(gl[i].x1 for i in L.members)
+    return n
 
 
 def _stacked_pairs(members: list, xh: float) -> int:
@@ -228,13 +419,13 @@ def freeze_regions(glyphs: list, lay, H: float, p: Params) -> dict:
                 g.notes.append("freeze:region")
                 stats["in_region"] += 1
 
-    # 2) เศษส่วน
-    if p.freeze_math:
-        for grp in _fraction_groups(texts, H):
-            stats["fraction_groups"] += 1
-            for g in grp:
-                g.frozen = True
-                g.notes.append("freeze:fraction")
+    # 2) เศษส่วน: ผูกเป็นหน่วยแข็ง (ไม่ freeze) → เลื่อนตามบรรทัดได้ แต่ไม่บิดรูป
+    if p.bind_fractions:
+        stats["fraction_groups"] = bind_fractions(glyphs, lay, H, p)
+        texts = [g for g in glyphs if g.kind == "text"]
+    # 2.1) ตัวยก/ตัวห้อย ผูกกับตัวทางซ้าย
+    if p.bind_scripts:
+        stats["scripts"] = bind_scripts(glyphs, lay, H, p)
 
     # 3) ต่อบรรทัด: ตัวซ้อน หรือ freeze เกินสัดส่วน → ทั้งบรรทัด, ไม่ถึง → ปลด freeze (จัดตามปกติ)
     for L in lay.lines:

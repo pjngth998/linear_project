@@ -200,7 +200,9 @@ with st.sidebar.expander("เลย์เอาต์ (B)"):
     prot_img = st.checkbox("ไม่แตะภาพที่แปะมา (รูป/ตาราง/ภาพหน้าจอ)", d.protect_images)
     prot_head = st.checkbox("ไม่แตะหัวเรื่องตัวใหญ่ / ตัวพิมพ์", d.protect_headings)
     neat = st.checkbox("ไม่แตะบรรทัดที่เรียบร้อยอยู่แล้ว", d.freeze_neat_lines)
-    freeze_math = st.checkbox("คงสูตร (เศษส่วน, ตัวซ้อน) ไว้ตามเดิม", d.freeze_math)
+    bind_frac = st.checkbox("ผูกเศษส่วน (dy/dx) เป็นหน่วยเดียว", d.bind_fractions,
+                            help="เศษส่วนเลื่อนตามบรรทัดทั้งก้อน ไม่ถูกเอียง/ย่อขยาย/แยกช่องไฟ")
+    freeze_math = st.checkbox("คงบรรทัดสูตรที่มีตัวซ้อนกันไว้ตามเดิม", d.freeze_math)
     bracket_h = st.slider("วงเล็บ/ปีกกา: สูงเกิน (×h)", 1.5, 4.0, d.bracket_h_h, 0.1)
     sparse_fill = st.slider("ภาพวาด: หมึกกินพื้นที่น้อยกว่า", 0.02, 0.3, d.sparse_fill, 0.01)
     freeze_frac = st.slider("freeze ทั้งบรรทัดเมื่อเกิน", 0.1, 0.8, d.freeze_line_frac, 0.05,
@@ -225,7 +227,7 @@ params = Params(
     dpi=dpi, flatten_background=flatten, blur=blur, thresh_C=thresh_C, ink_max=ink_max, background_mode=bg_mode, output_bg=out_bg, remove_ruled_lines=rm_lines,
     deskew=deskew, straighten_page=straighten, remove_highlighter=rm_hl,
     nontext_height_h=nontext_h, nontext_width_h=nontext_w, mark_height_h=mark_h, baseline_min_glyphs=min_glyphs,
-    freeze_regions=freeze_reg, protect_images=prot_img, protect_headings=prot_head, freeze_neat_lines=neat, freeze_math=freeze_math, bracket_h_h=bracket_h, sparse_fill=sparse_fill,
+    bind_fractions=bind_frac, freeze_regions=freeze_reg, protect_images=prot_img, protect_headings=prot_head, freeze_neat_lines=neat, freeze_math=freeze_math, bracket_h_h=bracket_h, sparse_fill=sparse_fill,
     freeze_line_frac=freeze_frac,
     enable_slant=en_slant, enable_scale=en_scale, enable_baseline=en_base, enable_spacing=en_space,
     enable_smoothing=en_smooth, slant_target=slant_target, slant_level=slant_level, slant_clip_deg=slant_clip, slant_shrink_n0=shrink_n0,

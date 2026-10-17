@@ -20,6 +20,7 @@ CLS_COLOR = {                     # BGR สำหรับ debug
     "tall": (40, 90, 140),
     "mark": (200, 40, 200),
     "punct": (90, 160, 90),
+    "fraction": (0, 120, 255),
 }
 
 NT_COLOR = {                      # BGR ของ non-text แต่ละชนิด (debug)
@@ -107,6 +108,13 @@ def _composite_warp(layer: Layer, g: Glyph, alpha_img: np.ndarray, color):
         cv2.fillPoly(m, [np.round(hole - off).astype(np.int32)], 0)
     m = cv2.dilate(m, np.ones((5, 5), np.uint8))
     a_src = alpha_img[y0:y1, x0:x1].astype(np.float32) * (m.astype(np.float32) / 255)
+    # ทำให้แกนเส้นของ "ตัวนี้" ทึบเต็ม: ความเข้มอ้างอิงเดิมคิดทั้งหน้า หมึกสีอ่อน (เทา/ฟ้า) จะจางลงซ้ำสอง
+    # ทั้งที่สีหมึกของตัวนี้ (color) ก็คือสีอ่อนนั้นอยู่แล้ว
+    core = a_src[m > 0]
+    if core.size:
+        ref = float(np.percentile(core, 90))
+        if ref > 0.05:
+            a_src = np.clip(a_src / ref, 0, 1)
 
     corners = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], float)
     dc = G.apply(g.T, corners)
@@ -249,7 +257,7 @@ def debug_overlay(color_img: np.ndarray, glyphs: list[Glyph], lay: Layout, p: Pa
 
 def legend_text() -> str:
     return ("เขียว = baseline, ฟ้า = เส้น x-height, กรอบน้ำเงิน = ตัวกลาง, ส้ม = หางขึ้น, ม่วง = หางลง, "
-            "น้ำตาล = เต็มสูง, เขียวอ่อน = เครื่องหมายยืนเดี่ยว (= - .), ชมพู = สระ/วรรณยุกต์ (เส้นโยงไปตัวเจ้าของ), เหลือง = Primary OBB, "
+            "น้ำตาล = เต็มสูง, เขียวอ่อน = เครื่องหมายยืนเดี่ยว (= - .), ส้มสด = เส้นเศษส่วน, ชมพู = สระ/วรรณยุกต์ (เส้นโยงไปตัวเจ้าของ), เหลือง = Primary OBB, "
             "non-text มีป้ายบอกชนิด: แดง = large, ส้มแดง = frame, ม่วงเข้ม = bracket, แดงเข้ม = line, ชมพูเข้ม = sparse, "
             "ฟ้าหม่น = image / in_image (ภาพที่แปะมา), เขียวเข้ม = heading (หัวเรื่องตัวใหญ่) · "
             "ฟ้าอมเขียว = ตัวที่ freeze (ในกรอบ/สูตร คงไว้ตามต้นฉบับ), เทา = ไม่มีเจ้าของ (ไม่แก้), กรอบหนา = ตัวติดกัน, "
