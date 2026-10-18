@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rewrite Reborn</title>
+<meta name="description" content="จัดลายมือในโน้ตให้เป็นระเบียบ โดยยังเป็นลายมือเดิมของคุณ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=Mali:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232335C9'/%3E%3Cpath d='M8 21c3-6 5-9 7-9s1 6 3 6 3-4 6-4' stroke='%23FFE45C' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="Rewrite Reborn หน้าแรก">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M7 21c3-6 5-9 7-9s1 6 3 6 3-4 7-4"/></svg>
+    <span>Rewrite Reborn</span>
+  </a>
+  <nav class="steps" aria-label="ขั้นตอน">
+    <ol>
+      <li data-step="1" class="is-active"><span class="dot">1</span>อัปโหลด</li>
+      <li data-step="2"><span class="dot">2</span>เลือกหน้า</li>
+      <li data-step="3"><span class="dot">3</span>ตั้งค่า</li>
+      <li data-step="4"><span class="dot">4</span>ผลลัพธ์</li>
+    </ol>
+  </nav>
+  <button class="link-btn" id="howBtn" type="button">ทำงานอย่างไร</button>
+</header>
+
+<main>
+  <!-- ---------- hero + upload ---------- -->
+  <section class="hero" id="hero">
+    <div class="hero-copy">
+      <h1>ลายมือเดิมของคุณ<br>แค่เป็นระเบียบขึ้น</h1>
+      <p class="lede">อัปโหลดโน้ตลายมือ เลือกหน้าที่ต้องการ แล้วระบบจะจัดเส้นบรรทัด ความเอียง ขนาด และช่องไฟให้ โดยไม่เปลี่ยนเป็นตัวพิมพ์ ใช้ได้ทั้งภาษาไทย อังกฤษ และตัวเลข</p>
+    </div>
+    <div class="scribble" aria-hidden="true">
+      <div class="paper">
+        <div class="line" id="demoLine"></div>
+        <div class="line line-2" id="demoLine2"></div>
+      </div>
+      <div class="scribble-caption">ตัวอย่าง: ตัวอักษรถูกยกเข้าแนวเดียวกัน แต่ยังเป็นลายมือเดิม</div>
+    </div>
+  </section>
+
+  <section class="drop-wrap" id="upload">
+    <label class="drop" id="drop" tabindex="0">
+      <input type="file" id="fileInput" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.goodnotes" hidden>
+      <svg class="drop-icon" viewBox="0 0 48 48" aria-hidden="true"><path d="M14 30l10-10 10 10M24 20v20"/><path d="M8 32a8 8 0 0 1 3-15.5A11 11 0 0 1 32 13a9 9 0 0 1 8 15"/></svg>
+      <strong>ลากไฟล์โน้ตมาวางที่นี่</strong>
+      <span>หรือ <u>เลือกไฟล์จากเครื่อง</u> · PDF, PNG, JPG · อัปได้หลายไฟล์พร้อมกัน</span>
+      <small>ใช้ GoodNotes อยู่? กด Share → Export → PDF ก่อน แล้วอัปโหลดไฟล์ PDF</small>
+    </label>
+  </section>
+
+  <!-- ---------- workspace ---------- -->
+  <section class="workspace" id="workspace" hidden>
+    <div class="pages-col">
+      <div class="col-head">
+        <h2>เลือกหน้าที่จะจัด</h2>
+        <p class="hint">แตะหน้าเพื่อเลือกหรือยกเลิก · กด Shift ค้างเพื่อเลือกหลายหน้าติดกัน</p>
+      </div>
+      <div id="fileList"></div>
+      <button class="ghost-btn add-more" id="addMore" type="button">+ เพิ่มไฟล์</button>
+    </div>
+
+    <aside class="settings" id="settings" aria-label="การตั้งค่า">
+      <h2>ตั้งค่า</h2>
+
+      <fieldset>
+        <legend>ความแรงในการจัด</legend>
+        <div class="seg" role="radiogroup" data-name="strength">
+          <button type="button" role="radio" data-v="light">เบา ๆ</button>
+          <button type="button" role="radio" data-v="medium" aria-checked="true">พอดี</button>
+          <button type="button" role="radio" data-v="strong">เต็มที่</button>
+        </div>
+        <p class="field-hint" id="strengthHint">ปรับพอให้เป็นระเบียบ และยังเห็นจังหวะการเขียนเดิม</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>จัดอะไรบ้าง</legend>
+        <div class="chips">
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_baseline">เส้นบรรทัด</button>
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_slant">ความเอียง</button>
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_size">ขนาดตัวอักษร</button>
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_spacing">ช่องไฟ</button>
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_shape">รูปตัวอักษร</button>
+          <button type="button" class="chip" aria-pressed="true" data-k="fix_lines">ระยะบรรทัด</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>ความเอียงของลายมือ</legend>
+        <div class="seg" role="radiogroup" data-name="slant_style">
+          <button type="button" role="radio" data-v="keep" aria-checked="true">คงแบบเดิม</button>
+          <button type="button" role="radio" data-v="upright">ตั้งตรง</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>พื้นหลังของผลลัพธ์</legend>
+        <div class="seg" role="radiogroup" data-name="output_bg">
+          <button type="button" role="radio" data-v="paper" aria-checked="true">กระดาษเดิม</button>
+          <button type="button" role="radio" data-v="white">พื้นขาว</button>
+        </div>
+      </fieldset>
+
+      <details class="more">
+        <summary>ตั้งค่าเพิ่มเติม</summary>
+        <fieldset>
+          <legend>สีพื้นของโน้ต</legend>
+          <div class="seg small" role="radiogroup" data-name="background">
+            <button type="button" role="radio" data-v="auto" aria-checked="true">ตรวจเอง</button>
+            <button type="button" role="radio" data-v="light">สว่าง</button>
+            <button type="button" role="radio" data-v="dark">มืด</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>การจับเส้นหมึก</legend>
+          <input type="range" id="sens" min="0" max="100" step="5" value="50" aria-describedby="sensHint">
+          <div class="range-labels"><span>เก็บเส้นจาง</span><span>ตัดจุดรบกวน</span></div>
+          <p class="field-hint" id="sensHint">ถ้าตัวหนังสือหายไปบางส่วน เลื่อนไปทางซ้าย ถ้ามีจุดหรือเงาติดมา เลื่อนไปทางขวา</p>
+        </fieldset>
+        <label class="switch"><input type="checkbox" id="lightInk"><span></span>ใช้ปากกาสีอ่อน (เหลือง ฟ้าอ่อน ชมพู)</label>
+        <label class="switch"><input type="checkbox" id="keepMath" checked><span></span>ไม่แตะสูตร กรอบ และภาพที่แปะไว้</label>
+      </details>
+
+      <button class="primary-btn" id="runBtn" type="button" disabled>เลือกหน้าก่อน</button>
+      <p class="field-hint center" id="etaHint"></p>
+    </aside>
+  </section>
+
+  <!-- ---------- results ---------- -->
+  <section class="results" id="results" hidden>
+    <div class="results-head">
+      <div>
+        <h2 id="resTitle">กำลังจัดลายมือ…</h2>
+        <div class="progress" aria-hidden="true"><svg viewBox="0 0 400 14" preserveAspectRatio="none"><path id="progPath" d="M2 9 C 40 3, 70 12, 110 7 S 180 4, 220 8 S 300 11, 340 6 S 380 5, 398 8"/></svg></div>
+        <p class="hint" id="resSub"></p>
+      </div>
+      <div class="res-actions">
+        <button class="ghost-btn" id="cancelBtn" type="button">หยุด</button>
+        <a class="ghost-btn" id="zipBtn" hidden>ดาวน์โหลด ZIP</a>
+        <a class="primary-btn" id="pdfBtn" hidden>ดาวน์โหลด PDF</a>
+      </div>
+    </div>
+    <div id="cards" class="cards"></div>
+    <button class="ghost-btn again" id="againBtn" type="button" hidden>ปรับค่าแล้วจัดใหม่</button>
+  </section>
+</main>
+
+<!-- ---------- viewer ---------- -->
+<div class="viewer" id="viewer" hidden role="dialog" aria-modal="true" aria-label="ดูภาพเต็มจอ">
+  <div class="viewer-bar">
+    <strong id="vTitle"></strong>
+    <div class="viewer-tools">
+      <button type="button" data-z="-1" aria-label="ซูมออก">−</button>
+      <span id="vZoom">100%</span>
+      <button type="button" data-z="1" aria-label="ซูมเข้า">+</button>
+      <button type="button" data-z="0">พอดีจอ</button>
+      <button type="button" id="vPrev" aria-label="หน้าก่อนหน้า">‹</button>
+      <button type="button" id="vNext" aria-label="หน้าถัดไป">›</button>
+      <button type="button" id="vClose" aria-label="ปิด">✕</button>
+    </div>
+  </div>
+  <div class="viewer-panes">
+    <figure><figcaption>ต้นฉบับ</figcaption><div class="pane"><img id="vBefore" alt="ต้นฉบับ"></div></figure>
+    <figure><figcaption>หลังจัด</figcaption><div class="pane"><img id="vAfter" alt="หลังจัด"></div></figure>
+  </div>
+  <p class="viewer-hint">เลื่อนลูกกลิ้งเพื่อซูม · ลากเพื่อเลื่อน ทั้งสองฝั่งขยับไปพร้อมกัน · กด Esc เพื่อปิด</p>
+</div>
+
+<div class="viewer" id="pagePreview" hidden role="dialog" aria-modal="true" aria-label="ดูหน้า">
+  <div class="viewer-bar"><strong id="ppTitle"></strong><div class="viewer-tools"><button type="button" id="ppToggle"></button><button type="button" id="ppClose" aria-label="ปิด">✕</button></div></div>
+  <div class="pp-body"><img id="ppImg" alt=""></div>
+</div>
+
+<div class="sheet" id="how" hidden role="dialog" aria-modal="true" aria-label="ระบบทำงานอย่างไร">
+  <div class="sheet-card">
+    <button type="button" class="sheet-close" id="howClose" aria-label="ปิด">✕</button>
+    <h2>ระบบทำงานอย่างไร</h2>
+    <ol class="how-list">
+      <li><b>แยกตัวอักษร</b> ระบบหาขอบของหมึกแต่ละชิ้น แล้วเก็บเป็นชุดจุดพิกัด สระและวรรณยุกต์ถูกผูกกับพยัญชนะของมัน</li>
+      <li><b>หาเส้นบรรทัด</b> ลากเส้นที่ใกล้จุดล่างของตัวอักษรในบรรทัดมากที่สุด</li>
+      <li><b>คำนวณการปรับ</b> แต่ละตัวได้เมทริกซ์ 1 ตัวที่รวมการแก้เอียง ปรับขนาด และเลื่อนลงเส้นบรรทัด</li>
+      <li><b>ยกหมึกจริงไปวาง</b> ไม่ได้วาดใหม่หรือเปลี่ยนเป็นตัวพิมพ์ ความหนาและสีของเส้นจึงเหมือนเดิม</li>
+    </ol>
+    <p class="hint">ภาพที่แปะไว้ ตาราง หัวเรื่องตัวพิมพ์ กรอบ และสูตรคณิตศาสตร์จะถูกคงไว้ตามเดิม</p>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
