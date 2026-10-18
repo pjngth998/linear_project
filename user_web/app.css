@@ -70,8 +70,14 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 80px
 }
 .hero h1 {
   font-family: var(--hand); font-weight: 700;
-  font-size: clamp(2.1rem, 4.6vw, 3.4rem); line-height: 1.22; letter-spacing: -.01em; color: var(--text);
+  font-size: clamp(1.9rem, 3.9vw, 3.4rem); color: var(--text);
+  /* ภาษาไทยมีสระบน วรรณยุกต์ และสระล่าง ซ้อนกันได้ถึง 3 ชั้น ต้องเผื่อระยะบรรทัดมากกว่าภาษาอังกฤษ
+     ไม่อย่างนั้นวรรณยุกต์ของบรรทัดล่างจะชนสระล่างของบรรทัดบน (เช่น ู ใน "คุณ" ชนกับ ื้ ใน "ขึ้น") */
+  line-height: 1.5;
 }
+.hero h1 span { display: block; white-space: nowrap; }
+/* บรรทัดที่ 2 เว้นห่างลงและเยื้องขวาเล็กน้อย (เหมือนเขียนมือ) ให้ วรรณยุกต์ของ "ขึ้น" ไม่ชนสระ ู ของ "คุณ" */
+.hero h1 .l2 { margin-top: .3em; padding-left: .9em; }
 .lede { font-size: 1.08rem; color: var(--muted); max-width: 34em; margin: 18px 0 0; }
 
 .scribble .paper {
