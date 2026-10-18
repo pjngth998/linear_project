@@ -34,7 +34,8 @@
 
   // ------------------------------------------------------------ hero demo: ตัวอักษรเบี้ยว → เข้าแนว
   function setupDemo() {
-    const lines = [["#demoLine", "เวกเตอร์คือปริมาณที่มีทิศทาง"], ["#demoLine2", "y = ax + b  ·  θ = (AᵀA)⁻¹Aᵀy"]];
+    // บรรทัดไทยมีสระบน-ล่างและวรรณยุกต์ (ตามพยัญชนะไปด้วย) · บรรทัดอังกฤษบอกว่ายังเป็นลายมือเดิม
+    const lines = [["#demoLine", "จดเร็วแค่ไหน ก็อ่านง่ายขึ้น"], ["#demoLine2", "same handwriting, just neater"]];
     const seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter("th", { granularity: "grapheme" }) : null;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const all = [];
@@ -47,20 +48,25 @@
         all.push(s);
       });
     }
-    const messUp = () => all.forEach((s) => {
+    const paper = $(".scribble .paper");
+    const messUp = () => { paper.classList.remove("is-tidy"); all.forEach((s) => {
       const r = (Math.random() - .5) * 22, y = (Math.random() - .5) * 18, sc = .82 + Math.random() * .36;
       s.style.transition = "none";
       s.style.transform = `translateY(${y}px) rotate(${r}deg) scale(${sc})`;
-    });
-    const tidy = () => all.forEach((s, i) => {
-      s.style.transition = "";
-      s.style.transitionDelay = reduce ? "0ms" : `${i * 18}ms`;
-      s.style.transform = "none";
-    });
+    }); };
+    const tidy = () => {
+      all.forEach((s, i) => {
+        s.style.transition = "";
+        s.style.transitionDelay = reduce ? "0ms" : `${i * 18}ms`;
+        s.style.transform = "none";
+      });
+      // ตัวอักษรเข้าที่แล้ว → เส้นบรรทัดเปลี่ยนจากเส้นประเป็นเส้นทึบ
+      setTimeout(() => paper.classList.add("is-tidy"), reduce ? 0 : 700 + all.length * 18);
+    };
     messUp();
     if (reduce) { tidy(); return; }
     setTimeout(tidy, 900);
-    $(".scribble .paper").addEventListener("click", () => { messUp(); setTimeout(tidy, 500); });
+    paper.addEventListener("click", () => { messUp(); setTimeout(tidy, 500); });
   }
 
   // ------------------------------------------------------------ steps

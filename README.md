@@ -6,11 +6,13 @@
 (เลื่อน เอียง ย่อ/ขยาย และปรับรูปเล็กน้อย) ให้ตัวอักษรอยู่บนเส้นบรรทัด เอียงเท่ากัน ขนาดสม่ำเสมอ
 ช่องไฟชัดเจน และหน้ากระดาษเป็นระเบียบ
 
+
 ## ติดตั้ง
 
-ต้องใช้ Python 3.10 ขึ้นไป
+ต้องใช้ Python 3.9 ขึ้นไป (ทดสอบแล้วกับ 3.9 และ 3.13)
 
 ```bash
+cd rewrite_reborn
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -20,7 +22,21 @@ pip install -r requirements.txt
 
 ## ใช้งาน
 
-### UI (แนะนำ)
+### เว็บแอปสำหรับผู้ใช้ (แนะนำ)
+
+```bash
+python user_web/server.py                        # เปิด http://localhost:8000 ให้อัตโนมัติ
+python user_web/server.py --port 8080 --no-browser
+```
+
+กด Ctrl+C ในหน้าต่าง terminal เพื่อหยุด ถ้าแก้ไฟล์หน้าเว็บแล้วไม่เห็นผล ให้รีเฟรชแบบล้าง cache (Ctrl+Shift+R / Cmd+Shift+R)
+
+1. ลากไฟล์มาวาง (อัปได้หลายไฟล์ หลายหน้า)
+2. แตะภาพย่อเพื่อเลือก/ยกเลิกหน้า (Shift + คลิก = เลือกหลายหน้าติดกัน, ปุ่ม ⤢ = ดูหน้าใหญ่)
+3. ตั้งค่าแบบเข้าใจง่าย: ความแรง (เบา ๆ / พอดี / เต็มที่), สิ่งที่จะจัด, ความเอียง, พื้นหลังผลลัพธ์ และตั้งค่าเพิ่มเติม
+4. ดูผลเทียบซ้าย-ขวา แตะภาพเพื่อดูเต็มจอ (ซูม/เลื่อนสองฝั่งพร้อมกัน) แล้วดาวน์โหลด PNG / PDF / ZIP
+
+### หน้าจอทดสอบสำหรับผู้พัฒนา (Streamlit)
 
 ```bash
 streamlit run app.py
@@ -131,8 +147,10 @@ rr/
                       → ประกอบกลับบนกระดาษเดิม
   evaluate.py     E   ตัวชี้วัดก่อน/หลัง + OCR (ไม่บังคับ)
   pipeline.py     รวมทุกขั้นสำหรับหน้าเดียว
-app.py            UI (Streamlit)
+user_web/         เว็บแอปสำหรับผู้ใช้ (FastAPI + HTML/CSS/JS)
+app.py            หน้าจอทดสอบสำหรับผู้พัฒนา (Streamlit)
 run.py            CLI
+report_tools/     สถิติชุดข้อมูล (dataset_stats.py), ภาพประกอบรายงาน (make_figures.py), เทียบกับ OCR (identity_vs_ocr.py)
 ```
 
 ## หลักการพีชคณิตเชิงเส้นที่ใช้
@@ -181,6 +199,31 @@ run.py            CLI
 | `mark_height_h` | สระ/วรรณยุกต์ถูกนับเป็นตัวฐาน → เพิ่ม, ตัวเล็กถูกนับเป็นสระ → ลด |
 | `output_bg` | `paper` วางบนกระดาษเดิม, `white` พื้นขาว |
 | `render_mode` | `warp` คงเส้นเดิม, `contour` เส้นเรียบ |
+
+## สคริปต์ประกอบรายงาน
+
+```bash
+python report_tools/make_figures.py notes.pdf --page 2 --out figures        # ภาพไล่ pipeline ทีละขั้น (fig01–fig20) + numbers.json
+python report_tools/dataset_stats.py data/ --out dataset_out                # สถิติชุดข้อมูล + การคัดกรอง → summary.md / summary.json / กราฟ
+python report_tools/identity_vs_ocr.py notes.pdf --pages all --out report_out   # เทียบ ต้นฉบับ / Rewrite Reborn / OCR
+```
+
+`dataset_stats.py` นับข้อมูล 1 ชุด = 1 หน้า และจัดแต่ละหน้าเป็น สมบูรณ์ / ต้องแก้ไข / ตัดทิ้ง
+เกณฑ์ปรับได้ที่ค่าคงที่ส่วนต้นของไฟล์ (`MIN_H`, `LOWRES_H`, `MIN_GLYPHS`, `FROZEN_MAX`, `SKEW_FIX`, `LIGHT_CV`)
+
+## เปรียบเทียบกับ OCR (สำหรับรายงาน)
+
+```bash
+python report_tools/identity_vs_ocr.py notes.pdf --pages all --out report_out
+```
+
+เทียบ 3 แบบ (ต้นฉบับ / Rewrite Reborn / OCR ที่พิมพ์ใหม่) ใน 2 มุม:
+
+- **เป็นระเบียบขึ้นไหม:** ตัวชี้วัดชุดเดียวกับข้างบน รวมเป็นดัชนี = ค่าเฉลี่ยของ % ที่ดีขึ้นจากต้นฉบับ
+- **ยังคงเอกลักษณ์ไหม:** cosine similarity ของภาพระดับคำเทียบกับต้นฉบับ (ทุกแบบถูกยืดให้เท่ากรอบเดิมและ blur σ = 2 px ก่อนวัด) พร้อมไม้บรรทัดคือ "ผู้เขียนเขียนคำเดิมซ้ำ" (cos ระหว่างคำเดียวกันสองครั้งในต้นฉบับ) และผลทดสอบความไวต่อ σ
+
+ข้อความ OCR ใช้ text layer ของ PDF ถ้ามี (เช่น GoodNotes) ไม่มีก็ใช้ tesseract
+ผลลัพธ์: `summary.json`, `words.csv`, กราฟ 2 รูป, ภาพตัวอย่างคำ และหน้าที่พิมพ์จาก OCR
 
 ## ข้อจำกัดที่รู้แล้ว
 

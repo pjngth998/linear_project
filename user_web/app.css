@@ -99,7 +99,11 @@ main { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 40px) 80px
   font-family: var(--hand); font-weight: 500; font-size: clamp(1.5rem, 3vw, 2.15rem); color: var(--ink);
   white-space: nowrap; line-height: 1.9; border-bottom: 2px dashed rgba(35, 53, 201, .22);
 }
-.line-2 { color: #c2410c; font-size: clamp(1.3rem, 2.6vw, 1.8rem); }
+.line-2 { color: #c2410c; font-size: clamp(1.25rem, 2.5vw, 1.75rem); }
+.line { transition: border-color .5s; }
+.paper.is-tidy .line { border-bottom-style: solid; border-bottom-color: rgba(35, 53, 201, .55); }
+.paper.is-tidy .line-2 { border-bottom-color: rgba(194, 65, 12, .5); }
+.scribble .paper { cursor: pointer; }
 .line .ch { display: inline-block; transition: transform 1.1s var(--ease); }
 .line .ch.sp { width: .35em; }
 .scribble-caption { margin-top: 14px; font-size: .85rem; color: var(--muted); padding-left: 6px; }
